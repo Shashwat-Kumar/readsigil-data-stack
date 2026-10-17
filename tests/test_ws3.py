@@ -122,9 +122,10 @@ def test_real_scheduler_backfill_gives_the_same_result():
         deadline = time.time() + 420
         states = {}
         while time.time() < deadline:
-            runs = af("dags", "list-runs", "harbour_eod", "-o", "json").stdout
+            out = af("dags", "list-runs", "harbour_eod", "-o", "json").stdout
+            payload = next((l for l in out.splitlines() if l.startswith("[")), "[]")  # Airflow logs to stdout before the JSON
             try:
-                states = {r["logical_date"][:10]: r["state"] for r in json.loads(runs) if r["run_id"].startswith("backfill__")}
+                states = {r["logical_date"][:10]: r["state"] for r in json.loads(payload) if r["run_id"].startswith("backfill__")}
             except ValueError:
                 states = {}
             if len(states) == 4 and all(s in ("success", "failed") for s in states.values()):
