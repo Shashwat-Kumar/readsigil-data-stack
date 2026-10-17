@@ -34,10 +34,15 @@ def mutant(tmp_path, name, replacements):
     return str(p)
 
 
-def report(results):
+def report(results, label=""):
+    import os
+    gha = os.environ.get("GITHUB_ACTIONS") == "true"
     for r in results:
         for c in r.controls:
             print(f"[{r.scenario}] {'PASS' if c.ok else 'FAIL'} {c.name}: {c.detail}")
+        if gha and label:
+            notes = " / ".join(n.replace("\n", " | ") for n in r.notes)[:1800]
+            print(f"::notice title={label} [{r.scenario}] run log::{notes}", flush=True)
 
 
 def test_solution_passes_every_control_under_crashes_and_scale_out():
@@ -49,7 +54,7 @@ def test_solution_passes_every_control_under_crashes_and_scale_out():
 
 def test_starter_loses_postings():
     results = ws2.run(str(WS / "consumer.py"), scenarios=("crash",), verbose=True, timeout=120)
-    report(results)
+    report(results, "starter")
     c = controls(results)
     assert not c[NAMES["once"]].ok, "the starter should lose postings; the crash test did not catch it"
     assert not c[NAMES["npci"]].ok
@@ -58,7 +63,7 @@ def test_starter_loses_postings():
 def test_without_on_conflict_a_redelivery_stops_the_consumer(tmp_path):
     path = mutant(tmp_path, "no_on_conflict", [("ON CONFLICT (txn_ref, leg) DO NOTHING\n", "")])
     results = ws2.run(path, scenarios=("crash",), verbose=True, timeout=120)
-    report(results)
+    report(results, "no ON CONFLICT")
     c = controls(results)
     assert not c[NAMES["once"]].ok
     assert not c[NAMES["lag"]].ok
@@ -72,7 +77,7 @@ def test_committing_before_posting_loses_events_on_a_crash(tmp_path):
         ("            consumer.commit(message=msg, asynchronous=False)  # only after the ledger has it\n", ""),
     ])
     results = ws2.run(path, scenarios=("crash",), verbose=True, timeout=150)
-    report(results)
+    report(results, "commit first")
     assert not controls(results)[NAMES["once"]].ok, "committing before posting should lose events when the consumer is killed"
 
 

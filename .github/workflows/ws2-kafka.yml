@@ -23,6 +23,13 @@ jobs:
         run: harbour doctor
       - name: Prove the workshop (solution passes, every bug is caught)
         run: pytest -v -s tests/test_ws2.py
+      - name: What a learner sees from the first draft
+        if: always()
+        run: |
+          harbour reset > /dev/null && harbour publish > /dev/null
+          timeout 20 python workshops/02-kafka/consumer.py > starter.log 2>&1 || true
+          tail -4 starter.log | sed 's/^/::notice title=first draft output::/'
+          harbour status | sed 's/^/::notice title=status after first draft::/'
       - name: Record the solution's control results
         if: always()
         run: |
