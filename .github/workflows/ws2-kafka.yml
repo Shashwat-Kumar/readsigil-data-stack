@@ -1,0 +1,60 @@
+name: Workshop 2 (Kafka) end to end
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  real-kafka:
+    name: Real Apache Kafka and Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Start Kafka and Postgres (docker compose, as learners do)
+        run: docker compose up -d --wait
+      - name: Install the kit
+        run: pip install -e '.[test]'
+      - name: harbour doctor
+        run: harbour doctor
+      - name: Prove the workshop (solution passes, every bug is caught)
+        run: pytest -v -s tests/test_ws2.py
+      - name: Record the solution's control results
+        if: always()
+        run: |
+          harbour check ws2 --consumer workshops/02-kafka/solution/consumer.py --json > check.json || true
+          python - <<'PY'
+          import json, os
+          try:
+              runs = json.load(open("check.json"))
+          except Exception as e:
+              print(f"::error title=check output::{e}"); raise SystemExit
+          lines = ["| Scenario | Control | Result |", "|---|---|---|"]
+          for r in runs:
+              for c in r["controls"]:
+                  lines.append(f"| {r['scenario']} | {c['name']} | {'PASS' if c['ok'] else 'FAIL'}: {c['detail']} |")
+                  level = "notice" if c["ok"] else "error"
+                  print(f"::{level} title={r['scenario']}: {c['name']}::{c['detail']}")
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a").write("\n".join(lines) + "\n")
+          PY
+      - name: Broker log on failure
+        if: failure()
+        run: docker compose logs --tail 40 kafka | sed 's/^/::warning title=kafka log::/' | tail -40
+
+  codespaces:
+    name: Same check inside the dev container (Codespaces path)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: devcontainers/ci@v0.3
+        with:
+          push: never
+          runCmd: |
+            docker compose up -d --wait
+            harbour doctor
+            harbour check ws2 --consumer workshops/02-kafka/solution/consumer.py --only crash

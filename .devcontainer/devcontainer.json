@@ -1,0 +1,12 @@
+{
+  "name": "Harbour Bank data stack",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "postCreateCommand": "pip install -e '.[test]'",
+  "postStartCommand": "docker compose up -d --wait",
+  "forwardPorts": [9092, 5432],
+  "customizations": { "vscode": { "extensions": ["ms-python.python"] } }
+}
