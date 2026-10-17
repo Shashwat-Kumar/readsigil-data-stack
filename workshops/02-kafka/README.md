@@ -62,7 +62,20 @@ Three things to notice:
 python workshops/02-kafka/consumer.py
 ```
 
-It posts for a few seconds, then stops with `UniqueViolation: duplicate key value violates unique constraint "uq_posting_leg"`. Since Friday the ledger refuses a second posting for the same `(txn_ref, leg)`, so the first redelivered event stops the consumer.
+It stops almost at once:
+
+```
+psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "uq_posting_leg"
+DETAIL:  Key (txn_ref, leg)=(628900398525, CUST) already exists.
+```
+
+Since Friday the ledger refuses a second posting for the same `(txn_ref, leg)`, so the first redelivered event stops the consumer. Now look at the damage:
+
+```bash
+harbour status
+```
+
+The ledger has no postings, yet consumer lag is 1,638, not 1,838. The draft told Kafka its first batch of 200 events was handled *before* writing it. The write then failed and rolled back. As far as the consumer group is concerned, those 200 transactions are done, and nobody will ever post them.
 
 Before you fix that, run the check that Risk will use:
 
@@ -99,7 +112,7 @@ Postgres can skip a row that would break a unique constraint: `INSERT ... ON CON
 
 ## 4. Acknowledge only what the ledger has
 
-Look at where the first draft calls `consumer.commit()`. It tells Kafka the batch is done *before* the postings are written. If the process dies in between, Kafka believes those events were handled, so nobody ever posts them. The crash test shows this as missing RRNs.
+You saw this in step 2: the first draft calls `consumer.commit()` before the postings are written. Any failure in between, whether an error or a killed process, leaves Kafka believing those events were handled. The crash test shows this as missing RRNs.
 
 <details><summary>Hint</summary>
 
