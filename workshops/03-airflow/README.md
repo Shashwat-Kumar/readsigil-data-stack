@@ -3,7 +3,7 @@
 **Harbour Bank · Sunday 18 October, 08:30.** Treasury reads one table every morning: `treasury_position`, one row per business date, written by the end-of-day pipeline in Airflow. Since Tuesday's deploy that table cannot be trusted.
 
 - Nothing came through for 13, 14 or 15 October.
-- 16 October appears several times, with different figures.
+- 16 October appears three times, with three different figures.
 - On-call reran the pipeline at 02:40 on Saturday when NPCI's file was late. The 07:42 email from Finance in Workshop 1 is what followed.
 
 You own the DAG. Backfill 13 to 16 October so that each date is published exactly once, correctly, however many times it is run. Then the check will tell Treasury whether the table can be trusted again.

@@ -188,8 +188,24 @@ def reset_db() -> None:
                     cp.write_row((r["rrn"], "GL", GL_UPI, date, "DR" if r["dr_cr"] == "CR" else "CR", a, "UPI", "UPI", t))
 
 
+def _bad_week_positions() -> list:
+    """What last week's runs left in treasury_position: nothing for 13 to 15 Oct, and three
+    different rows for 16 Oct (a half-read file, then two on-call reruns that appended)."""
+    day = days()[LATE_DATE]
+    raw, led = day["raw"], day["ledger_cust"]
+    net = lambda rows: sum(r["amount"] if r["dr_cr"] == "CR" else -r["amount"] for r in rows)
+    gl = net(led)
+    part = net(raw[: int(len(raw) * 0.6)])
+    out = []
+    for npci, brk, at in ((part, 721, "2026-10-17 02:41:09+05:30"), (part + net(raw), 1802, "2026-10-17 03:05:44+05:30"), (part + 2 * net(raw), 1803, "2026-10-17 03:22:17+05:30")):
+        out.append((LATE_DATE, f"{npci / 100:.2f}", f"{gl / 100:.2f}", f"{(npci - gl) / 100:.2f}", brk, at))
+    return out
+
+
 def reset() -> None:
     reset_db()
+    with psycopg.connect(dsn()) as conn:
+        conn.cursor().executemany("INSERT INTO treasury_position (business_date, npci_net, gl_net, difference, breaks, published_at) VALUES (%s,%s,%s,%s,%s,%s)", _bad_week_positions())
     reset_landing()
 
 
