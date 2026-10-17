@@ -12,9 +12,10 @@
     "cpus": 2,
     "memory": "8gb"
   },
-  "postCreateCommand": "pip install -e '.[test]'",
+  "postCreateCommand": "./scripts/install-airflow.sh",
   "postStartCommand": "docker compose up -d --wait",
   "forwardPorts": [
+    8080,
     9092,
     5432
   ],
@@ -23,6 +24,11 @@
       "extensions": [
         "ms-python.python"
       ]
+    }
+  },
+  "portsAttributes": {
+    "8080": {
+      "label": "Airflow UI"
     }
   }
 }

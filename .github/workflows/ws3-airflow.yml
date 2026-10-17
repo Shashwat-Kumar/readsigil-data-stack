@@ -1,0 +1,56 @@
+name: Workshop 3 (Airflow) end to end
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  real-airflow:
+    name: Real Apache Airflow and Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Start Postgres (docker compose, as learners do)
+        run: docker compose up -d --wait postgres
+      - name: Install Airflow and the kit
+        run: ./scripts/install-airflow.sh
+      - name: Prove the workshop (solution passes, every bug is caught, scheduler backfill agrees)
+        run: pytest -v -s tests/test_ws3.py
+      - name: What the production DAG does, for the guide
+        if: always()
+        run: |
+          harbour check ws3 --json > ws3.json || true
+          python - <<'PY'
+          import json
+          try:
+              r = json.load(open("ws3.json"))
+          except Exception as e:
+              print(f"::error title=ws3 production json::{e}"); raise SystemExit
+          for label, d, code, tail in r["runs"]:
+              print(f"::notice title=production DAG {label} {d}::exit {code} | " + tail.replace(chr(10), " | ")[:700])
+          PY
+
+  codespaces:
+    name: Same check inside the dev container (Codespaces path)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the dev container CLI
+        run: npm install -g @devcontainers/cli
+      - name: Build and start the dev container
+        run: |
+          set -o pipefail
+          devcontainer up --workspace-folder . 2>&1 | tee up.log
+      - name: Build log on failure
+        if: failure()
+        run: |
+          grep -iE "error|failed|denied|unable|not found|E: " up.log | tail -25 | sed 's/^/::warning title=devcontainer::/'
+      - name: Run the check inside the dev container
+        run: |
+          devcontainer exec --workspace-folder . bash -lc "docker compose up -d --wait postgres && harbour check ws3 --dag workshops/03-airflow/solution/harbour_eod.py"
