@@ -59,7 +59,8 @@ jobs:
           devcontainer up --workspace-folder . 2>&1 | tee up.log
       - name: Build log on failure
         if: failure()
-        run: grep -iE "error|failed|denied|unable|not found|E: " up.log | tail -25 | sed 's/^/::warning title=devcontainer::/'
+        run: |
+          grep -iE "error|failed|denied|unable|not found|E: " up.log | tail -25 | sed 's/^/::warning title=devcontainer::/'
       - name: Run the check inside the dev container
         run: |
           devcontainer exec --workspace-folder . bash -lc "docker compose up -d --wait && harbour doctor && harbour check ws2 --consumer workshops/02-kafka/solution/consumer.py --only crash"
